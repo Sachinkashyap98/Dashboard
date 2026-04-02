@@ -25,6 +25,9 @@ jobs:
 
       - name: npm install
         run: npm install
+
+      - name: Install API dependencies
+        run: npm install
         working-directory: api
 
       - name: Upload artifact for deployment job
