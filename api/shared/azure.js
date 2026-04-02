@@ -87,7 +87,10 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
     dataSet: {
       granularity: "None",
       aggregation: { totalCost: { name: "Cost", function: "Sum" } },
-      grouping: [{ type: "Dimension", name: "ServiceName" }],
+      grouping: [
+        { type: "Dimension", name: "ServiceName" },
+        { type: "Dimension", name: "ResourceId" },
+      ],
     },
     timeframe: "Custom",
     timePeriod: { from: start, to: end },
@@ -108,24 +111,26 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   const rows = r.body.properties?.rows || [];
   const costIdx = cols.indexOf("cost");
   const svcIdx = cols.indexOf("servicename");
-  const curIdx = cols.indexOf("billingcurrencycode");
-  const currency = rows[0]?.[curIdx] || "USD";
+  const resIdx = cols.indexOf("resourceid");
 
-  const services = [];
-  let total = 0;
   const svcMap = {};
+  const resources = [];
+  let total = 0;
   for (const row of rows) {
     const cost = parseFloat(row[costIdx] || 0);
     if (cost <= 0) continue;
-    const name = row[svcIdx] || "Other";
-    svcMap[name] = (svcMap[name] || 0) + cost;
+    const svc = row[svcIdx] || "Other";
+    const resId = row[resIdx] || "";
+    const resName = resId.split("/").pop() || resId || "Unknown";
+    svcMap[svc] = (svcMap[svc] || 0) + cost;
+    resources.push({ resource: resName, service: svc, cost: Math.round(cost * 100) / 100 });
     total += cost;
   }
-  for (const [name, cost] of Object.entries(svcMap)) {
-    services.push({ name, cost: Math.round(cost * 100) / 100 });
-  }
-  services.sort((a, b) => b.cost - a.cost);
-  return { services, total: Math.round(total * 100) / 100, currency: "USD" };
+  const services = Object.entries(svcMap)
+    .map(([name, cost]) => ({ name, cost: Math.round(cost * 100) / 100 }))
+    .sort((a, b) => b.cost - a.cost);
+  resources.sort((a, b) => b.cost - a.cost);
+  return { services, resources, total: Math.round(total * 100) / 100 };
 }
 
 // ── Key Vault helpers ─────────────────────────────────────────────────────────

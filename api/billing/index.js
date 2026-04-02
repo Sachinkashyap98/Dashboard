@@ -14,8 +14,8 @@ async function fetchOne(account, monthOffset) {
     if (!credsRaw) return { ...account, error: "Credentials not found in Key Vault", total: 0, services: [] };
     const { tenantId, clientId, clientSecret } = JSON.parse(credsRaw);
     const token = await getToken(tenantId, clientId, clientSecret);
-    const { services, total } = await fetchBilling(token, account.subscriptionId, monthOffset);
-    return { ...account, total, services, error: null };
+    const { services, resources, total } = await fetchBilling(token, account.subscriptionId, monthOffset);
+    return { ...account, total, services, resources, error: null };
   } catch (e) {
     return { ...account, total: 0, services: [], error: e.message };
   }
@@ -60,8 +60,8 @@ module.exports = async function (context, req) {
         body: JSON.stringify({
           month: monthLabel(offset),
           fetchedAt: new Date().toISOString(),
-          accounts: accounts.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, error }) =>
-            ({ id, label, subscriptionId, subName, budgetUsd, total, services, error }))
+          accounts: accounts.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, resources, error }) =>
+            ({ id, label, subscriptionId, subName, budgetUsd, total, services, resources, error }))
         }),
       };
       return;
@@ -77,8 +77,8 @@ module.exports = async function (context, req) {
       body: JSON.stringify({
         month: monthLabel(0),
         fetchedAt: new Date().toISOString(),
-        accounts: m0.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, error }) =>
-          ({ id, label, subscriptionId, subName, budgetUsd, total, services, error }))
+        accounts: m0.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, resources, error }) =>
+          ({ id, label, subscriptionId, subName, budgetUsd, total, services, resources, error }))
       }),
     };
   } catch (e) {

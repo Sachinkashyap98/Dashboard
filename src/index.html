@@ -223,7 +223,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
         <div class="tcard">
           <div class="tcard-head">
             <h2>All accounts — spend summary</h2>
-            <input type="text" class="search" placeholder="Search..." oninput="filterTable('sum-tbody',this.value)"/>
+            <div style="display:flex;gap:8px">
+              <input type="text" class="search" placeholder="Search..." oninput="filterTable('sum-tbody',this.value)"/>
+              <button class="btn btn-ghost" onclick="downloadExcel()">⬇ Excel</button>
+            </div>
           </div>
           <div style="overflow-x:auto">
             <table><thead><tr>
@@ -234,6 +237,19 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
         </div>
       </div>
     </div>
+
+        <div class="tcard" id="res-card" style="display:none">
+          <div class="tcard-head">
+            <h2>Resource breakdown</h2>
+            <input type="text" class="search" placeholder="Search..." oninput="filterTable('res-tbody',this.value)"/>
+          </div>
+          <div style="overflow-x:auto">
+            <table><thead><tr>
+              <th>Resource</th><th>Service</th><th>Account</th><th>Cost</th>
+            </tr></thead>
+            <tbody id="res-tbody"></tbody></table>
+          </div>
+        </div>
 
     <!-- ACCOUNTS -->
     <div id="page-accounts" class="page">
@@ -537,6 +553,7 @@ function renderAll(){
   const prev=sel.value;
   sel.innerHTML=accs.map((a,i)=>`<option value="${i}">${a.label||a.subscriptionId} (${a.subscriptionId.slice(0,8)}…)</option>`).join('');
   if(prev&&sel.querySelector(`option[value="${prev}"]`))sel.value=prev;
+  renderResources();
 }
 
 // ── registered accounts table ─────────────────────────────────────────────────
@@ -717,6 +734,48 @@ function renderInvoice(){
       <div class="tr grand"><span>Total due</span><span>${fmt(tot)}</span></div>
     </div></div>
     <div class="inv-foot">Payment: Azure Portal → Cost Management + Billing → Invoices | Ref: ${invNum}</div>`;
+}
+
+// ── resource breakdown ─────────────────────────────────────────────────────────
+function renderResources(){
+  const accs=BILLING.accounts||[];
+  const allRes=[];
+  accs.forEach(a=>{
+    (a.resources||[]).forEach(r=>allRes.push({...r,account:a.label||a.subscriptionId}));
+  });
+  if(!allRes.length){document.getElementById('res-card').style.display='none';return;}
+  document.getElementById('res-card').style.display='block';
+  document.getElementById('res-tbody').innerHTML=allRes.map(r=>`<tr>
+    <td><strong>${r.resource}</strong></td>
+    <td style="color:var(--muted);font-size:12px">${r.service}</td>
+    <td style="font-size:12px">${r.account}</td>
+    <td><strong>${fmt(r.cost)}</strong></td>
+  </tr>`).join('');
+}
+
+// ── excel download ───────────────────────────────────────────────────────────────
+function downloadExcel(){
+  const accs=BILLING.accounts||[];
+  const month=BILLING.month||'';
+  const rows=[['Month','Account','Subscription ID','Resource','Service','Cost','Currency']];
+  accs.forEach(a=>{
+    const cur=CURRENCY==='INR'?'INR':'USD';
+    if(a.resources&&a.resources.length){
+      a.resources.forEach(r=>{
+        rows.push([month,a.label,a.subscriptionId,r.resource,r.service,
+          CURRENCY==='INR'?Math.round(r.cost):+(r.cost/USD_TO_INR).toFixed(2),cur]);
+      });
+    } else {
+      rows.push([month,a.label,a.subscriptionId,'—','—',
+        CURRENCY==='INR'?Math.round(a.total):+(a.total/USD_TO_INR).toFixed(2),cur]);
+    }
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`azure-billing-${month}.csv`;
+  a.click();
 }
 
 // ── currency toggle ──────────────────────────────────────────────────────────
