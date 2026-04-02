@@ -245,7 +245,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div style="overflow-x:auto">
             <table><thead><tr>
-              <th>Publisher</th><th>Charge Type</th><th>Service Family</th><th>Service</th><th>Meter</th><th>Account</th><th>Cost</th>
+              <th>Publisher</th><th>Charge Type</th><th>Service Family</th><th>Service</th><th>Meter</th><th>Resource</th><th>Resource Group</th><th>Account</th><th>Cost</th>
             </tr></thead>
             <tbody id="res-tbody"></tbody></table>
           </div>
@@ -750,7 +750,9 @@ function renderResources(){
     <td>${r.chargeType||'Usage'}</td>
     <td>${r.serviceFamily||''}</td>
     <td><strong>${r.service}</strong></td>
-    <td style="color:var(--muted);font-size:12px">${r.meter||''}</td>
+    <td style="font-size:12px;color:var(--muted)">${r.meter||''}</td>
+    <td style="font-size:12px">${r.resource||''}</td>
+    <td style="font-size:12px;color:var(--muted)">${r.resourceGroup||''}</td>
     <td style="font-size:12px">${r.account}</td>
     <td><strong>${fmt(r.cost)}</strong></td>
   </tr>`).join('');
@@ -763,12 +765,12 @@ function downloadExcel(){
   const cur=CURRENCY==='INR'?'INR':'USD';
   const [yr,mn]=(month||'').split('-');
   const startDate=month?`${yr}-${mn}-01`:'';
-  const rows=[['PublisherType','ChargeType','ServiceFamily','ServiceName','Meter','PartNumber','CostUSD','Cost','Currency']];
+  const rows=[['PublisherType','ChargeType','ServiceFamily','ServiceName','Meter','ResourceName','ResourceGroup','ResourceType','CostUSD','Cost','Currency']];
   accs.forEach(a=>{
     (a.resources||[]).forEach(r=>{
       const costInr=Math.round(r.cost*100)/100;
       const costUsd=+(r.cost/USD_TO_INR).toFixed(8);
-      rows.push([r.publisherType||'Microsoft',r.chargeType||'Usage',r.serviceFamily||'',r.service,r.meter||'','',costUsd,costInr,'INR']);
+      rows.push([r.publisherType||'Microsoft',r.chargeType||'Usage',r.serviceFamily||'',r.service,r.meter||'',r.resource||'',r.resourceGroup||'',r.resourceType||'',costUsd,costInr,'INR']);
     });
   });
   // Scope section like Azure portal

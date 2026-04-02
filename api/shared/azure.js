@@ -94,6 +94,8 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
         { type: "Dimension", name: "ChargeType" },
         { type: "Dimension", name: "PublisherType" },
         { type: "Dimension", name: "ResourceId" },
+        { type: "Dimension", name: "ResourceGroup" },
+        { type: "Dimension", name: "ResourceType" },
       ],
     },
     timeframe: "Custom",
@@ -120,6 +122,8 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   const chargeIdx = cols.indexOf("chargetype");
   const pubIdx    = cols.indexOf("publishertype");
   const resIdx    = cols.indexOf("resourceid");
+  const rgIdx     = cols.indexOf("resourcegroup");
+  const rtIdx     = cols.indexOf("resourcetype");
 
   const svcMap = {};
   const resources = [];
@@ -133,6 +137,8 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
     const charge    = row[chargeIdx] || "Usage";
     const publisher = row[pubIdx]    || "Microsoft";
     const resId     = row[resIdx]    || "";
+    const resGroup  = row[rgIdx]     || "";
+    const resType   = row[rtIdx]     || "";
     const resName   = resId.split("/").pop() || resId || "Unknown";
     svcMap[svc] = (svcMap[svc] || 0) + cost;
     resources.push({
@@ -142,6 +148,9 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
       service: svc,
       meter,
       resource: resName,
+      resourceGroup: resGroup,
+      resourceType: resType,
+      resourceId: resId,
       cost: Math.round(cost * 100) / 100
     });
     total += cost;
