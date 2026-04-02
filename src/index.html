@@ -184,9 +184,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
   <div class="topbar">
     <h1 id="page-title">Overview</h1>
     <div class="tb-right">
-      <select class="sel" id="month-sel" onchange="loadBilling()">
-        <option value="current" selected>Current month</option>
-        <option value="last">Last month</option>
+      <select class="sel" id="month-sel" onchange="switchMonth()">
+        <option value="0" selected>Current month</option>
+        <option value="-1">Last month</option>
+        <option value="-2">2 months ago</option>
       </select>
       <button class="btn btn-primary" id="refresh-btn" onclick="loadBilling()">Refresh</button>
     </div>
@@ -200,6 +201,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
       <div id="ov-loader" class="loader"><div class="spin"></div><span style="font-size:13px;color:var(--muted)">Fetching billing data...</span></div>
       <div id="ov-content" style="display:none">
         <div class="metrics" id="metrics-grid"></div>
+        <div id="trend-card" class="card" style="margin-bottom:20px;display:none">
+          <div class="card-title">Total spend — last 3 months</div>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </div>
         <div class="charts-row">
           <div class="card">
             <div class="card-title">Spend by account (top 8)</div>
@@ -336,7 +341,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
 const COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#c62828','#00838f','#f57f17','#4527a0','#1565c0','#558b2f','#6d4c41','#00695c'];
 const PIE_COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#00838f','#aaa'];
 
-let BILLING=null, REGISTRY=[], barInst=null, pieInst=null;
+let BILLING=null, ALL_MONTHS=[], REGISTRY=[], barInst=null, pieInst=null, trendInst=null;
 
 const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
 const fmtDate=s=>new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
@@ -383,8 +388,11 @@ async function loadBilling(){
   try{
     const r=await fetch('/api/billing');
     if(!r.ok){const e=await r.json().catch(()=>({error:r.statusText}));throw new Error(e.error||r.statusText)}
-    BILLING=await r.json();
+    const data=await r.json();
+    ALL_MONTHS=data.months||[];
+    BILLING={...data, accounts: data.accounts||[]};
     renderAll();
+    renderTrend();
     const errs=(BILLING.accounts||[]).filter(a=>a.error).length;
     setStatus(errs===0,'Live data'+(errs>0?` (${errs} errors)`:''),'Updated '+new Date().toLocaleTimeString('en-IN'));
   }catch(e){
@@ -395,6 +403,41 @@ async function loadBilling(){
     btn.disabled=false; btn.textContent='Refresh';
     document.getElementById('ov-loader').style.display='none';
   }
+}
+
+// ── switch month ─────────────────────────────────────────────────────────────
+function switchMonth(){
+  const offset=parseInt(document.getElementById('month-sel').value)||0;
+  const idx=ALL_MONTHS.findIndex(m=>{
+    const d=new Date(); d.setMonth(d.getMonth()+offset);
+    return m.month===d.toISOString().slice(0,7);
+  });
+  if(idx>=0){
+    BILLING={...BILLING, accounts: ALL_MONTHS[idx].accounts, month: ALL_MONTHS[idx].month};
+    renderAll();
+  }
+}
+
+// ── trend chart ───────────────────────────────────────────────────────────────
+function renderTrend(){
+  if(!ALL_MONTHS.length)return;
+  const trendCard=document.getElementById('trend-card');
+  if(trendCard)trendCard.style.display='block';
+  const labels=ALL_MONTHS.map(m=>{
+    const [y,mo]=m.month.split('-');
+    return new Date(y,mo-1).toLocaleString('en-IN',{month:'short',year:'2-digit'});
+  });
+  const totals=ALL_MONTHS.map(m=>Math.round(m.accounts.reduce((s,a)=>s+a.total,0)));
+  const ctx=document.getElementById('trendChart');
+  if(!ctx)return;
+  if(trendInst)trendInst.destroy();
+  trendInst=new Chart(ctx,{type:'line',data:{
+    labels,
+    datasets:[{data:totals,borderColor:'#0078d4',backgroundColor:'#0078d420',fill:true,tension:.35,pointRadius:5,pointBackgroundColor:'#0078d4'}]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)}}},
+    scales:{x:{ticks:{font:{size:11}},grid:{display:false}},
+            y:{ticks:{font:{size:11},callback:v=>'$'+Math.round(v/1000)+'k'},grid:{color:'#e2e6ea44'}}}}});
 }
 
 // ── render overview ───────────────────────────────────────────────────────────

@@ -71,13 +71,15 @@ async function getSubscriptionName(token, subscriptionId) {
   }
 }
 
-/** Fetch current-month cost grouped by ServiceName */
-async function fetchBilling(token, subscriptionId) {
+/** Fetch cost grouped by ServiceName for a given month offset (0=current, -1=last, -2=two months ago) */
+async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .split("T")[0];
-  const end = now.toISOString().split("T")[0];
+  const y = now.getFullYear();
+  const m = now.getMonth() + monthOffset;
+  const start = new Date(y, m, 1).toISOString().split("T")[0];
+  const end = monthOffset === 0
+    ? now.toISOString().split("T")[0]
+    : new Date(y, m + 1, 0).toISOString().split("T")[0];
 
   const payload = JSON.stringify({
     type: "ActualCost",
