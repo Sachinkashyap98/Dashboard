@@ -3,7 +3,7 @@ const path = require('path');
 const app = express();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'src')));
+app.use(express.static(path.join(__dirname, 'src'), { etag: false, maxAge: 0 }));
 
 // Adapter: converts Express req/res to Azure Functions context/req style
 function adapt(handler) {
