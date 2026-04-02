@@ -1,11 +1,11 @@
 const { getToken, fetchBilling, loadRegistry, kvGet } = require("../shared/azure");
 
-const CONCURRENCY = 8;
+const CONCURRENCY = 4;
 
 function monthLabel(offset) {
   const d = new Date();
   d.setMonth(d.getMonth() + offset);
-  return d.toISOString().slice(0, 7); // "YYYY-MM"
+  return d.toISOString().slice(0, 7);
 }
 
 async function fetchOne(account, monthOffset) {
@@ -14,8 +14,8 @@ async function fetchOne(account, monthOffset) {
     if (!credsRaw) return { ...account, error: "Credentials not found in Key Vault", total: 0, services: [] };
     const { tenantId, clientId, clientSecret } = JSON.parse(credsRaw);
     const token = await getToken(tenantId, clientId, clientSecret);
-    const { services, total, currency } = await fetchBilling(token, account.subscriptionId, monthOffset);
-    return { ...account, total, services, currency, error: null };
+    const { services, total } = await fetchBilling(token, account.subscriptionId, monthOffset);
+    return { ...account, total, services, error: null };
   } catch (e) {
     return { ...account, total: 0, services: [], error: e.message };
   }
@@ -46,29 +46,40 @@ module.exports = async function (context, req) {
     const filterSub = req.query.sub || null;
     const toFetch = filterSub ? registry.filter((a) => a.subscriptionId === filterSub) : registry;
 
-    // Fetch last 3 months sequentially to avoid rate limiting
-    const m2 = await batchFetch(toFetch, CONCURRENCY, -2);
-    await new Promise(r => setTimeout(r, 1000));
-    const m1 = await batchFetch(toFetch, CONCURRENCY, -1);
-    await new Promise(r => setTimeout(r, 1000));
+    // Check if specific month requested (offset param)
+    const offsetParam = req.query.offset;
+
+    if (offsetParam !== undefined) {
+      // Single month fetch on demand
+      const offset = parseInt(offsetParam) || 0;
+      const accounts = await batchFetch(toFetch, CONCURRENCY, offset);
+      accounts.sort((a, b) => b.total - a.total);
+      context.res = {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" },
+        body: JSON.stringify({
+          month: monthLabel(offset),
+          fetchedAt: new Date().toISOString(),
+          accounts: accounts.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, error }) =>
+            ({ id, label, subscriptionId, subName, budgetUsd, total, services, error }))
+        }),
+      };
+      return;
+    }
+
+    // Default: fetch only current month
     const m0 = await batchFetch(toFetch, CONCURRENCY, 0);
-
-    const months = [
-      { month: monthLabel(-2), accounts: m2.sort((a, b) => b.total - a.total) },
-      { month: monthLabel(-1), accounts: m1.sort((a, b) => b.total - a.total) },
-      { month: monthLabel(0),  accounts: m0.sort((a, b) => b.total - a.total) },
-    ];
-
-    // Also expose flat "accounts" for current month (backward compat)
-    const accounts = m0.sort((a, b) => b.total - a.total).map(
-      ({ id, label, subscriptionId, subName, budgetUsd, total, services, currency, error }) =>
-        ({ id, label, subscriptionId, subName, budgetUsd, total, services, currency, error })
-    );
+    m0.sort((a, b) => b.total - a.total);
 
     context.res = {
       status: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "max-age=300" },
-      body: JSON.stringify({ month: monthLabel(0), fetchedAt: new Date().toISOString(), months, accounts }),
+      body: JSON.stringify({
+        month: monthLabel(0),
+        fetchedAt: new Date().toISOString(),
+        accounts: m0.map(({ id, label, subscriptionId, subName, budgetUsd, total, services, error }) =>
+          ({ id, label, subscriptionId, subName, budgetUsd, total, services, error }))
+      }),
     };
   } catch (e) {
     context.log.error("billing error:", e.message);

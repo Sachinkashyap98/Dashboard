@@ -424,15 +424,32 @@ async function loadBilling(){
 }
 
 // ── switch month ─────────────────────────────────────────────────────────────
-function switchMonth(){
+async function switchMonth(){
   const offset=parseInt(document.getElementById('month-sel').value)||0;
-  const idx=ALL_MONTHS.findIndex(m=>{
-    const d=new Date(); d.setMonth(d.getMonth()+offset);
-    return m.month===d.toISOString().slice(0,7);
-  });
-  if(idx>=0){
-    BILLING={...BILLING, accounts: ALL_MONTHS[idx].accounts, month: ALL_MONTHS[idx].month};
+  const d=new Date(); d.setMonth(d.getMonth()+offset);
+  const targetMonth=d.toISOString().slice(0,7);
+  const cached=ALL_MONTHS.find(m=>m.month===targetMonth);
+  if(cached){
+    BILLING={...BILLING,accounts:cached.accounts,month:cached.month};
+    renderAll(); return;
+  }
+  const btn=document.getElementById('refresh-btn');
+  btn.disabled=true; btn.textContent='Loading...';
+  document.getElementById('ov-loader').style.display='flex';
+  document.getElementById('ov-content').style.display='none';
+  try{
+    const r=await fetch('/api/billing?offset='+offset);
+    if(!r.ok) throw new Error((await r.json()).error||r.statusText);
+    const data=await r.json();
+    ALL_MONTHS.push({month:data.month,accounts:data.accounts});
+    BILLING={...BILLING,accounts:data.accounts,month:data.month};
     renderAll();
+  }catch(e){
+    document.getElementById('err-banner').style.display='block';
+    document.getElementById('err-banner').textContent='Error: '+e.message;
+  }finally{
+    btn.disabled=false; btn.textContent='Refresh';
+    document.getElementById('ov-loader').style.display='none';
   }
 }
 
@@ -468,9 +485,9 @@ function renderAll(){
   const errors=accs.filter(a=>a.error).length;
   const overBudget=accs.filter(a=>a.budgetUsd&&a.total>a.budgetUsd).length;
   document.getElementById('metrics-grid').innerHTML=[
-    ['Total spend',fmt(total,'MIXED'),BILLING.month,''],
+    ['Total spend',fmt(total),BILLING.month,''],
     ['Accounts',accs.length,'Connected',''],
-    ['Highest spender',top.label||top.name||'—',fmt(top.total||0,top.currency),'up'],
+    ['Highest spender',top.label||top.name||'—',fmt(top.total||0),'up'],
     ['Alerts',overBudget+errors,overBudget+' over budget, '+errors+' errors','up'],
   ].map(([l,v,s,c])=>`<div class="metric"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub ${c}">${s}</div></div>`).join('');
   // bar chart
@@ -506,8 +523,8 @@ function renderAll(){
     return `<tr>
       <td><strong>${a.label||'—'}</strong></td>
       <td><span class="mono">${a.subscriptionId}</span></td>
-      <td><strong>${fmt(a.total,a.currency)}</strong></td>
-      <td>${a.budgetUsd?fmt(a.budgetUsd,a.currency):'—'}</td>
+      <td><strong>${fmt(a.total)}</strong></td>
+      <td>${a.budgetUsd?fmt(a.budgetUsd):'—'}</td>
       <td>${pct!==null?`<div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${bc}"></div></div><span style="font-size:11px;color:var(--muted)">${pct}%</span></div>`:'—'}</td>
       <td><span class="badge ${badge}">${label}</span>${a.error?`<div style="font-size:10px;color:var(--red);margin-top:2px">${a.error.slice(0,60)}</div>`:''}</td>
     </tr>`;
