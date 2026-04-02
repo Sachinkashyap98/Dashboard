@@ -359,7 +359,7 @@ async function fetchRate() {
 
 function fmtAmt(usd) {
   if (CURRENCY === 'INR') {
-    return '₹' + Math.round(usd * USD_TO_INR).toLocaleString('en-IN');
+    return '₹' + Math.round(usd).toLocaleString('en-IN');
   }
   return '$' + Math.round(usd).toLocaleString('en-US');
 }
@@ -679,9 +679,6 @@ function renderInvoice(){
   const sub=Math.round(a.total);
   const gst=Math.round(sub*0.18);
   const tot=sub+gst;
-  const subInr=Math.round(a.total*USD_TO_INR);
-  const gstInr=Math.round(subInr*0.18);
-  const totInr=subInr+gstInr;
   const now=new Date();
   const mo=BILLING.month||now.toISOString().slice(0,7);
   const [yr,mn]=mo.split('-');
@@ -701,7 +698,7 @@ function renderInvoice(){
       <div><div class="al">Billed by</div><div class="an">Microsoft Azure India</div><div class="ad">GSTIN: 36AAACM9517G1ZN</div></div>
     </div>
     <div class="inv-stats">
-      <div class="is"><div class="l">Total (incl. GST)</div><div class="v">${fmt(tot)}</div><div class="s">= ₹${Math.round(totInr).toLocaleString('en-IN')} @ ₹${Math.round(USD_TO_INR)}/USD</div></div>
+      <div class="is"><div class="l">Total (incl. GST)</div><div class="v">${fmt(tot)}</div><div class="s">18% GST applied</div></div>
       <div class="is"><div class="l">Services</div><div class="v">${svcs.length}</div><div class="s">Active this month</div></div>
       <div class="is"><div class="l">Month</div><div class="v" style="font-size:14px">${moName}</div></div>
     </div>
