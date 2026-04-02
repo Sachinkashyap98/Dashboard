@@ -46,12 +46,12 @@ module.exports = async function (context, req) {
     const filterSub = req.query.sub || null;
     const toFetch = filterSub ? registry.filter((a) => a.subscriptionId === filterSub) : registry;
 
-    // Fetch last 3 months in parallel
-    const [m0, m1, m2] = await Promise.all([
-      batchFetch(toFetch, CONCURRENCY, 0),
-      batchFetch(toFetch, CONCURRENCY, -1),
-      batchFetch(toFetch, CONCURRENCY, -2),
-    ]);
+    // Fetch last 3 months sequentially to avoid rate limiting
+    const m2 = await batchFetch(toFetch, CONCURRENCY, -2);
+    await new Promise(r => setTimeout(r, 1000));
+    const m1 = await batchFetch(toFetch, CONCURRENCY, -1);
+    await new Promise(r => setTimeout(r, 1000));
+    const m0 = await batchFetch(toFetch, CONCURRENCY, 0);
 
     const months = [
       { month: monthLabel(-2), accounts: m2.sort((a, b) => b.total - a.total) },
