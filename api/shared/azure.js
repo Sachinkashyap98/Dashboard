@@ -89,13 +89,7 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
       aggregation: { totalCost: { name: "Cost", function: "Sum" } },
       grouping: [
         { type: "Dimension", name: "ServiceName" },
-        { type: "Dimension", name: "ServiceFamily" },
-        { type: "Dimension", name: "MeterName" },
-        { type: "Dimension", name: "ChargeType" },
-        { type: "Dimension", name: "PublisherType" },
         { type: "Dimension", name: "ResourceId" },
-        { type: "Dimension", name: "ResourceGroup" },
-        { type: "Dimension", name: "ResourceType" },
       ],
     },
     timeframe: "Custom",
@@ -117,40 +111,33 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   const rows = r.body.properties?.rows || [];
   const costIdx   = cols.indexOf("cost");
   const svcIdx    = cols.indexOf("servicename");
-  const famIdx    = cols.indexOf("servicefamily");
-  const meterIdx  = cols.indexOf("metername");
-  const chargeIdx = cols.indexOf("chargetype");
-  const pubIdx    = cols.indexOf("publishertype");
   const resIdx    = cols.indexOf("resourceid");
-  const rgIdx     = cols.indexOf("resourcegroup");
-  const rtIdx     = cols.indexOf("resourcetype");
 
   const svcMap = {};
   const resources = [];
   let total = 0;
   for (const row of rows) {
-    const cost = parseFloat(row[costIdx] || 0);
+    const cost   = parseFloat(row[costIdx] || 0);
     if (cost <= 0) continue;
-    const svc       = row[svcIdx]    || "Other";
-    const family    = row[famIdx]    || "";
-    const meter     = row[meterIdx]  || "";
-    const charge    = row[chargeIdx] || "Usage";
-    const publisher = row[pubIdx]    || "Microsoft";
-    const resId     = row[resIdx]    || "";
-    const resGroup  = row[rgIdx]     || "";
-    const resType   = row[rtIdx]     || "";
-    const resName   = resId.split("/").pop() || resId || "Unknown";
+    const svc   = row[svcIdx] || "Other";
+    const resId = row[resIdx] || "";
+    // /subscriptions/{sub}/resourceGroups/{rg}/providers/{type}/{name}
+    const parts       = resId.toLowerCase().split("/");
+    const rgIdx2      = parts.indexOf("resourcegroups");
+    const provIdx     = parts.indexOf("providers");
+    const resGroup    = rgIdx2  >= 0 ? parts[rgIdx2  + 1] : "";
+    const resType     = provIdx >= 0 ? parts.slice(provIdx + 1, provIdx + 3).join("/") : "";
+    const resName     = resId.split("/").pop() || resId || "Unknown";
     svcMap[svc] = (svcMap[svc] || 0) + cost;
     resources.push({
-      publisherType: publisher,
-      chargeType: charge,
-      serviceFamily: family,
+      publisherType: "Microsoft",
+      chargeType: "Usage",
+      serviceFamily: "",
       service: svc,
-      meter,
+      meter: "",
       resource: resName,
       resourceGroup: resGroup,
       resourceType: resType,
-      resourceId: resId,
       cost: Math.round(cost * 100) / 100
     });
     total += cost;
