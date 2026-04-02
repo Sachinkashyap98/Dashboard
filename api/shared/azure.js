@@ -87,7 +87,10 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
     dataSet: {
       granularity: "None",
       aggregation: { totalCost: { name: "Cost", function: "Sum" } },
-      grouping: [{ type: "Dimension", name: "ServiceName" }],
+      grouping: [
+        { type: "Dimension", name: "ServiceName" },
+        { type: "Dimension", name: "BillingCurrencyCode" },
+      ],
     },
     timeframe: "Custom",
     timePeriod: { from: start, to: end },
@@ -104,9 +107,7 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   if (r.status !== 200)
     throw new Error(`Cost API error ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
 
-  const cols = (r.body.properties?.columns || []).map((c) =>
-    c.name.toLowerCase()
-  );
+  const cols = (r.body.properties?.columns || []).map((c) => c.name.toLowerCase());
   const rows = r.body.properties?.rows || [];
   const costIdx = cols.indexOf("cost");
   const svcIdx = cols.indexOf("servicename");
