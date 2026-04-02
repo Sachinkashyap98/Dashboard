@@ -361,7 +361,7 @@ function fmtAmt(usd) {
   if (CURRENCY === 'INR') {
     return '₹' + Math.round(usd).toLocaleString('en-IN');
   }
-  return '$' + Math.round(usd).toLocaleString('en-US');
+  return '$' + (usd / USD_TO_INR).toFixed(2);
 }
 
 const fmt = (n) => fmtAmt(n);
