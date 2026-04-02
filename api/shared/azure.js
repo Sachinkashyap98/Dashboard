@@ -2,18 +2,19 @@
 // Shared helpers used by all Azure Functions
 
 const https = require("https");
+const http  = require("http");
 
 function httpsRequest(method, hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
     const data = body ? Buffer.from(body) : null;
-    const req = https.request(
+    const isHttps = !hostname.startsWith("http://");
+    const lib = isHttps ? https : http;
+    const req = lib.request(
       {
-        hostname,
+        hostname: hostname.replace(/^https?:\/\//, ""),
         path,
         method,
-        headers: data
-          ? { ...headers, "Content-Length": data.length }
-          : headers,
+        headers: data ? { ...headers, "Content-Length": data.length } : headers,
       },
       (res) => {
         let raw = "";
@@ -124,17 +125,31 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
 
 // ── Key Vault helpers ─────────────────────────────────────────────────────────
 
-/** Get a Key Vault token using the Function's Managed Identity */
+/** Get a Key Vault token using Managed Identity (App Service) */
 async function getKeyVaultToken() {
-  // Works on Azure (Managed Identity endpoint)
-  const r = await httpsRequest(
-    "GET",
-    "169.254.169.254",
-    "/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net",
-    { Metadata: "true" }
-  );
+  const endpoint = process.env.IDENTITY_ENDPOINT;
+  const header   = process.env.IDENTITY_HEADER;
+
+  if (!endpoint || !header)
+    throw new Error("Managed Identity not configured (IDENTITY_ENDPOINT/IDENTITY_HEADER missing)");
+
+  const url = new URL(`${endpoint}?api-version=2019-08-01&resource=https://vault.azure.net`);
+  const lib = url.protocol === "https:" ? https : http;
+
+  const r = await new Promise((resolve, reject) => {
+    const req = lib.get(
+      { hostname: url.hostname, path: url.pathname + url.search, headers: { "X-IDENTITY-HEADER": header } },
+      (res) => {
+        let raw = "";
+        res.on("data", c => raw += c);
+        res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
+      }
+    );
+    req.on("error", reject);
+  });
+
   if (!r.body.access_token)
-    throw new Error("Could not get Managed Identity token for Key Vault");
+    throw new Error(`Managed Identity token failed: ${JSON.stringify(r.body)}`);
   return r.body.access_token;
 }
 
