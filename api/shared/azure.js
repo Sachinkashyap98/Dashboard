@@ -87,10 +87,7 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
     dataSet: {
       granularity: "None",
       aggregation: { totalCost: { name: "Cost", function: "Sum" } },
-      grouping: [
-        { type: "Dimension", name: "ServiceName" },
-        { type: "Dimension", name: "BillingCurrencyCode" },
-      ],
+      grouping: [{ type: "Dimension", name: "ServiceName" }],
     },
     timeframe: "Custom",
     timePeriod: { from: start, to: end },
@@ -116,14 +113,19 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
 
   const services = [];
   let total = 0;
+  const svcMap = {};
   for (const row of rows) {
     const cost = parseFloat(row[costIdx] || 0);
     if (cost <= 0) continue;
-    services.push({ name: row[svcIdx] || "Other", cost: Math.round(cost * 100) / 100 });
+    const name = row[svcIdx] || "Other";
+    svcMap[name] = (svcMap[name] || 0) + cost;
     total += cost;
   }
+  for (const [name, cost] of Object.entries(svcMap)) {
+    services.push({ name, cost: Math.round(cost * 100) / 100 });
+  }
   services.sort((a, b) => b.cost - a.cost);
-  return { services, total: Math.round(total * 100) / 100, currency };
+  return { services, total: Math.round(total * 100) / 100, currency: "USD" };
 }
 
 // ── Key Vault helpers ─────────────────────────────────────────────────────────
