@@ -245,7 +245,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
           </div>
           <div style="overflow-x:auto">
             <table><thead><tr>
-              <th>Resource</th><th>Service</th><th>Account</th><th>Cost</th>
+              <th>Publisher</th><th>Charge Type</th><th>Service Family</th><th>Service</th><th>Meter</th><th>Account</th><th>Cost</th>
             </tr></thead>
             <tbody id="res-tbody"></tbody></table>
           </div>
@@ -746,8 +746,11 @@ function renderResources(){
   if(!allRes.length){document.getElementById('res-card').style.display='none';return;}
   document.getElementById('res-card').style.display='block';
   document.getElementById('res-tbody').innerHTML=allRes.map(r=>`<tr>
-    <td><strong>${r.resource}</strong></td>
-    <td style="color:var(--muted);font-size:12px">${r.service}</td>
+    <td>${r.publisherType||'Microsoft'}</td>
+    <td>${r.chargeType||'Usage'}</td>
+    <td>${r.serviceFamily||''}</td>
+    <td><strong>${r.service}</strong></td>
+    <td style="color:var(--muted);font-size:12px">${r.meter||''}</td>
     <td style="font-size:12px">${r.account}</td>
     <td><strong>${fmt(r.cost)}</strong></td>
   </tr>`).join('');
@@ -757,19 +760,34 @@ function renderResources(){
 function downloadExcel(){
   const accs=BILLING.accounts||[];
   const month=BILLING.month||'';
-  const rows=[['Month','Account','Subscription ID','Resource','Service','Cost','Currency']];
+  const cur=CURRENCY==='INR'?'INR':'USD';
+  const [yr,mn]=(month||'').split('-');
+  const startDate=month?`${yr}-${mn}-01`:'';
+  const rows=[['PublisherType','ChargeType','ServiceFamily','ServiceName','Meter','PartNumber','CostUSD','Cost','Currency']];
   accs.forEach(a=>{
-    const cur=CURRENCY==='INR'?'INR':'USD';
-    if(a.resources&&a.resources.length){
-      a.resources.forEach(r=>{
-        rows.push([month,a.label,a.subscriptionId,r.resource,r.service,
-          CURRENCY==='INR'?Math.round(r.cost):+(r.cost/USD_TO_INR).toFixed(2),cur]);
-      });
-    } else {
-      rows.push([month,a.label,a.subscriptionId,'—','—',
-        CURRENCY==='INR'?Math.round(a.total):+(a.total/USD_TO_INR).toFixed(2),cur]);
-    }
+    (a.resources||[]).forEach(r=>{
+      const costInr=Math.round(r.cost*100)/100;
+      const costUsd=+(r.cost/USD_TO_INR).toFixed(8);
+      rows.push([r.publisherType||'Microsoft',r.chargeType||'Usage',r.serviceFamily||'',r.service,r.meter||'','',costUsd,costInr,'INR']);
+    });
   });
+  // Scope section like Azure portal
+  rows.push([],[]);
+  rows.push(['','Scope','']);
+  accs.forEach(a=>{
+    rows.push(['','Name:',a.subName||a.label]);
+    rows.push(['','Type:','Subscription']);
+    rows.push(['','ID:',`/subscriptions/${a.subscriptionId}`]);
+  });
+  rows.push([]);
+  rows.push(['','View:','Invoice details']);
+  rows.push(['','Start date:',startDate]);
+  rows.push(['','Granularity:','None']);
+  rows.push(['','Group by:','Meter']);
+  rows.push([]);
+  rows.push(['','Actual cost:',accs.reduce((s,a)=>s+a.total,0).toFixed(2)]);
+  rows.push([]);
+  rows.push(['','Generated:',new Date().toUTCString()]);
   const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');

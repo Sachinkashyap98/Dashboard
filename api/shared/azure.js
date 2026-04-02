@@ -89,6 +89,10 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
       aggregation: { totalCost: { name: "Cost", function: "Sum" } },
       grouping: [
         { type: "Dimension", name: "ServiceName" },
+        { type: "Dimension", name: "ServiceFamily" },
+        { type: "Dimension", name: "MeterName" },
+        { type: "Dimension", name: "ChargeType" },
+        { type: "Dimension", name: "PublisherType" },
         { type: "Dimension", name: "ResourceId" },
       ],
     },
@@ -109,9 +113,13 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
 
   const cols = (r.body.properties?.columns || []).map((c) => c.name.toLowerCase());
   const rows = r.body.properties?.rows || [];
-  const costIdx = cols.indexOf("cost");
-  const svcIdx = cols.indexOf("servicename");
-  const resIdx = cols.indexOf("resourceid");
+  const costIdx   = cols.indexOf("cost");
+  const svcIdx    = cols.indexOf("servicename");
+  const famIdx    = cols.indexOf("servicefamily");
+  const meterIdx  = cols.indexOf("metername");
+  const chargeIdx = cols.indexOf("chargetype");
+  const pubIdx    = cols.indexOf("publishertype");
+  const resIdx    = cols.indexOf("resourceid");
 
   const svcMap = {};
   const resources = [];
@@ -119,11 +127,23 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   for (const row of rows) {
     const cost = parseFloat(row[costIdx] || 0);
     if (cost <= 0) continue;
-    const svc = row[svcIdx] || "Other";
-    const resId = row[resIdx] || "";
-    const resName = resId.split("/").pop() || resId || "Unknown";
+    const svc       = row[svcIdx]    || "Other";
+    const family    = row[famIdx]    || "";
+    const meter     = row[meterIdx]  || "";
+    const charge    = row[chargeIdx] || "Usage";
+    const publisher = row[pubIdx]    || "Microsoft";
+    const resId     = row[resIdx]    || "";
+    const resName   = resId.split("/").pop() || resId || "Unknown";
     svcMap[svc] = (svcMap[svc] || 0) + cost;
-    resources.push({ resource: resName, service: svc, cost: Math.round(cost * 100) / 100 });
+    resources.push({
+      publisherType: publisher,
+      chargeType: charge,
+      serviceFamily: family,
+      service: svc,
+      meter,
+      resource: resName,
+      cost: Math.round(cost * 100) / 100
+    });
     total += cost;
   }
   const services = Object.entries(svcMap)
