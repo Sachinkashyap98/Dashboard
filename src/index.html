@@ -189,6 +189,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
         <option value="-1">Last month</option>
         <option value="-2">2 months ago</option>
       </select>
+      <button class="btn btn-ghost" id="currency-btn" onclick="toggleCurrency()">Show in ₹ INR</button>
       <button class="btn btn-primary" id="refresh-btn" onclick="loadBilling()">Refresh</button>
     </div>
   </div>
@@ -342,8 +343,26 @@ const COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#c62828','#00838f','#f57f
 const PIE_COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#00838f','#aaa'];
 
 let BILLING=null, ALL_MONTHS=[], REGISTRY=[], barInst=null, pieInst=null, trendInst=null;
+let USD_TO_INR = 84; // fallback rate
+let CURRENCY = 'USD';
 
-const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
+async function fetchRate() {
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD');
+    const d = await r.json();
+    if (d.rates && d.rates.INR) USD_TO_INR = d.rates.INR;
+  } catch { /* use fallback */ }
+}
+
+function fmtAmt(usd) {
+  if (CURRENCY === 'INR') {
+    const inr = usd * USD_TO_INR;
+    return '₹' + Math.round(inr).toLocaleString('en-IN');
+  }
+  return '$' + Math.round(usd).toLocaleString('en-US');
+}
+
+const fmt = n => fmtAmt(n);
 const fmtDate=s=>new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 
 // ── nav ───────────────────────────────────────────────────────────────────────
@@ -641,6 +660,9 @@ function renderInvoice(){
   const sub=Math.round(a.total);
   const gst=Math.round(sub*0.18);
   const tot=sub+gst;
+  const subInr=Math.round(a.total*USD_TO_INR);
+  const gstInr=Math.round(subInr*0.18);
+  const totInr=subInr+gstInr;
   const now=new Date();
   const mo=BILLING.month||now.toISOString().slice(0,7);
   const [yr,mn]=mo.split('-');
@@ -660,7 +682,7 @@ function renderInvoice(){
       <div><div class="al">Billed by</div><div class="an">Microsoft Azure India</div><div class="ad">GSTIN: 36AAACM9517G1ZN</div></div>
     </div>
     <div class="inv-stats">
-      <div class="is"><div class="l">Total (incl. GST)</div><div class="v">${fmt(tot)}</div><div class="s">18% GST applied</div></div>
+      <div class="is"><div class="l">Total (incl. GST)</div><div class="v">${fmt(tot)}</div><div class="s">= ₹${Math.round(totInr).toLocaleString('en-IN')} @ ₹${Math.round(USD_TO_INR)}/USD</div></div>
       <div class="is"><div class="l">Services</div><div class="v">${svcs.length}</div><div class="s">Active this month</div></div>
       <div class="is"><div class="l">Month</div><div class="v" style="font-size:14px">${moName}</div></div>
     </div>
@@ -681,8 +703,17 @@ function renderInvoice(){
     <div class="inv-foot">Payment: Azure Portal → Cost Management + Billing → Invoices | Ref: ${invNum}</div>`;
 }
 
+// ── currency toggle ──────────────────────────────────────────────────────────
+function toggleCurrency(){
+  CURRENCY = CURRENCY === 'USD' ? 'INR' : 'USD';
+  const btn = document.getElementById('currency-btn');
+  btn.textContent = CURRENCY === 'USD' ? 'Show in ₹ INR' : 'Show in $ USD';
+  if(BILLING) { renderAll(); renderTrend(); }
+}
+
 // ── init ──────────────────────────────────────────────────────────────────────
 (async()=>{
+  await fetchRate();
   await loadRegistry();
   await loadBilling();
 })();
