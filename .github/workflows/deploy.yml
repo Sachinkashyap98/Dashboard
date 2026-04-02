@@ -3,27 +3,27 @@ name: Deploy to Azure App Service
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
-      - name: Build
-        run: |
-          cd api   # ya src (jaha package.json hai)
-          npm install
-          npm run build --if-present
+      - name: Install API dependencies
+        run: npm install
+        working-directory: api
 
-      - name: Deploy
-        uses: azure/webapps-deploy@v2
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
         with:
-          app-name: i2k2-azuredashboard
+          app-name: ${{ secrets.AZURE_APP_SERVICE_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
