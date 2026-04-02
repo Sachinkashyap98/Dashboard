@@ -1,0 +1,4 @@
+label,tenantId,clientId,clientSecret,subscriptionId,budgetUsd
+Client A — Production,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb,your-secret-here,cccccccc-cccc-cccc-cccc-cccccccccccc,10000
+Client A — Dev,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa,bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb,your-secret-here,dddddddd-dddd-dddd-dddd-dddddddddddd,3000
+Client B — Production,eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee,ffffffff-ffff-ffff-ffff-ffffffffffff,your-secret-here,gggggggg-gggg-gggg-gggg-gggggggggggg,15000

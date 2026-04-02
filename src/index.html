@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Azure Billing Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f7fa;--surface:#fff;--border:#e2e6ea;
+  --text:#1a202c;--muted:#718096;--hint:#a0aec0;
+  --blue:#0078d4;--blue-lt:#e6f1fb;--blue-dk:#106ebe;
+  --green:#2e7d32;--green-lt:#e8f5e9;
+  --amber:#e65100;--amber-lt:#fff3e0;
+  --red:#c62828;--red-lt:#ffebee;
+  --r:10px;--rs:6px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.shell{display:flex;min-height:100vh}
+
+/* sidebar */
+.sb{width:210px;min-width:210px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-brand{display:flex;align-items:center;gap:9px;padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+.sb-icon{width:28px;height:28px;background:var(--blue);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-icon svg{width:15px;height:15px;fill:#fff}
+.sb-title{font-size:12px;font-weight:600;line-height:1.4;color:var(--text)}
+.sb-nav{padding:10px 8px;flex:1}
+.ni{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--rs);font-size:13px;color:var(--muted);cursor:pointer;margin-bottom:1px;user-select:none}
+.ni:hover{background:var(--bg);color:var(--text)}
+.ni.active{background:var(--blue-lt);color:var(--blue);font-weight:500}
+.ni svg{width:14px;height:14px;flex-shrink:0}
+.ni .badge-count{margin-left:auto;background:var(--blue);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px}
+.sb-foot{padding:10px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--hint);line-height:1.7}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;background:var(--green)}
+.dot.err{background:var(--red)}
+
+/* main */
+.main{flex:1;overflow:auto;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0}
+.topbar h1{font-size:16px;font-weight:600}
+.tb-right{display:flex;align-items:center;gap:8px}
+.sel{padding:6px 9px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text);cursor:pointer}
+.btn{padding:7px 13px;border:none;border-radius:var(--rs);font-size:13px;cursor:pointer;font-weight:500}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue-dk)}
+.btn-danger{background:var(--red-lt);color:var(--red);border:1px solid #ffcdd2}.btn-danger:hover{background:#ffcdd2}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text)}.btn-ghost:hover{background:var(--bg)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+
+.content{padding:20px 22px;flex:1}
+.page{display:none}.page.active{display:block}
+
+/* metrics */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.metric .lbl{font-size:11px;color:var(--muted);margin-bottom:5px}
+.metric .val{font-size:22px;font-weight:600}
+.metric .sub{font-size:11px;color:var(--hint);margin-top:2px}
+.metric .sub.up{color:var(--red)}.metric .sub.ok{color:var(--green)}
+
+/* charts */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:680px){.charts-row{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+.chart-wrap{position:relative;width:100%;height:210px}
+
+/* tables */
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
+.tcard-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.tcard-head h2{font-size:13px;font-weight:600}
+.search{padding:6px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--bg);color:var(--text);width:180px}
+.search:focus{outline:none;border-color:var(--blue)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 14px;font-size:11px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);background:#fafbfc;white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+.mono{font-family:"Courier New",monospace;font-size:11px;color:var(--hint)}
+.bar-wrap{background:var(--bg);border-radius:3px;height:5px;width:100px;overflow:hidden;display:inline-block}
+.bar-fill{height:100%;border-radius:3px}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px}
+.b-ok{background:var(--green-lt);color:var(--green)}
+.b-warn{background:var(--amber-lt);color:var(--amber)}
+.b-over{background:var(--red-lt);color:var(--red)}
+.b-err{background:#f3f4f6;color:#374151}
+
+/* admin panel */
+.admin-grid{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:start}
+@media(max-width:760px){.admin-grid{grid-template-columns:1fr}}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px}
+.form-card h2{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--text)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:4px}
+.field input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--blue)}
+.field input.err-input{border-color:var(--red)}
+.hint-text{font-size:11px;color:var(--hint);margin-top:3px}
+.form-actions{display:flex;gap:8px;margin-top:14px}
+.form-msg{font-size:12px;margin-top:10px;padding:8px 10px;border-radius:var(--rs);display:none}
+.form-msg.ok{background:var(--green-lt);color:var(--green);display:block}
+.form-msg.fail{background:var(--red-lt);color:var(--red);display:block}
+.csv-area{background:var(--bg);border:1px dashed var(--border);border-radius:var(--rs);padding:12px;margin-top:12px;font-size:12px;color:var(--muted);cursor:pointer;text-align:center}
+.csv-area:hover{border-color:var(--blue);color:var(--blue)}
+input[type=file]{display:none}
+
+/* invoice */
+.inv-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:26px 28px;max-width:740px}
+.inv-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.inv-logo{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600}
+.inv-logo-icon{width:30px;height:30px;background:var(--blue);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.inv-logo-icon svg{width:16px;height:16px;fill:#fff}
+.inv-meta{text-align:right;font-size:13px}
+.inv-meta .n{font-weight:600}.inv-meta .d{color:var(--muted);margin-top:2px}
+hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
+.inv-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:460px){.inv-2col{grid-template-columns:1fr}}
+.al{font-size:11px;color:var(--hint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.an{font-weight:600;font-size:13px;margin-bottom:2px}
+.ad{font-size:12px;color:var(--muted);line-height:1.6}
+.inv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.is{background:var(--bg);border-radius:var(--rs);padding:11px 13px}
+.is .l{font-size:11px;color:var(--muted);margin-bottom:3px}
+.is .v{font-size:18px;font-weight:600}
+.is .s{font-size:11px;color:var(--hint);margin-top:2px}
+.inv-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}
+.inv-table th{text-align:left;padding:6px 8px;font-size:11px;font-weight:600;color:var(--hint);border-bottom:1px solid var(--border);text-transform:uppercase}
+.inv-table td{padding:9px 8px;border-bottom:1px solid var(--border)}
+.inv-table tr:last-child td{border-bottom:none}
+.inv-totals{display:flex;justify-content:flex-end}
+.itb{width:240px}
+.tr{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:var(--muted)}
+.tr.grand{border-top:1px solid var(--border);margin-top:5px;padding-top:8px;font-weight:600;font-size:14px;color:var(--text)}
+.inv-foot{font-size:11px;color:var(--hint);line-height:1.7;margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+
+/* loader */
+.loader{display:flex;flex-direction:column;align-items:center;padding:50px 20px;gap:12px}
+.spin{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{background:var(--red-lt);border:1px solid #ffcdd2;border-radius:var(--r);padding:14px 16px;color:var(--red);font-size:13px;margin-bottom:16px}
+
+/* progress overlay */
+.progress-overlay{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;margin-bottom:16px;display:none}
+.progress-bar-bg{background:var(--bg);border-radius:4px;height:8px;overflow:hidden;margin:8px 0}
+.progress-bar-fill{height:100%;border-radius:4px;background:var(--blue);transition:width .3s ease}
+
+@media print{.sb,.topbar,.btn,.search,.sel{display:none!important}.main{overflow:visible}.content{padding:0}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="sb">
+  <div class="sb-brand">
+    <div class="sb-icon"><svg viewBox="0 0 18 18"><path d="M9 1L1 6v6l8 5 8-5V6L9 1zm0 2.2l5.8 3.3-2.1 1.2L9 5.5 5.3 7.7 3.2 6.5 9 3.2zM2.5 7.6l2.1 1.2v2.4L9 13.5l4.4-2.3V8.8l2.1-1.2V11l-6.5 4-6.5-4V7.6z"/></svg></div>
+    <div class="sb-title">Azure Billing<br>Dashboard</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="ni active" onclick="showPage('overview',this)">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h6v6H1zm8 0h6v6H9zM1 11h6v4H1zm8 0h6v4H9z"/></svg>
+      Overview
+    </div>
+    <div class="ni" onclick="showPage('accounts',this)">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z"/></svg>
+      Accounts
+      <span class="badge-count" id="acc-count">0</span>
+    </div>
+    <div class="ni" onclick="showPage('invoice',this)">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm1 3v1h6V4H5zm0 3v1h6V7H5zm0 3v1h4v-1H5z"/></svg>
+      Invoice
+    </div>
+    <div class="ni" onclick="showPage('admin',this)">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 1 1 0 4A2 2 0 0 1 8 1zM6 7h4l1 8H5L6 7zm-4 0h2l.5 4H3l-1-4zm8 0h2l1 4h-1.5L10 7z"/></svg>
+      Manage accounts
+    </div>
+  </nav>
+  <div class="sb-foot">
+    <div><span class="dot" id="status-dot"></span><span id="status-txt">Initialising...</span></div>
+    <div id="status-time"></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <h1 id="page-title">Overview</h1>
+    <div class="tb-right">
+      <select class="sel" id="month-sel" onchange="loadBilling()">
+        <option value="current" selected>Current month</option>
+        <option value="last">Last month</option>
+      </select>
+      <button class="btn btn-primary" id="refresh-btn" onclick="loadBilling()">Refresh</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="err-banner" class="err-box" style="display:none"></div>
+
+    <!-- OVERVIEW -->
+    <div id="page-overview" class="page active">
+      <div id="ov-loader" class="loader"><div class="spin"></div><span style="font-size:13px;color:var(--muted)">Fetching billing data...</span></div>
+      <div id="ov-content" style="display:none">
+        <div class="metrics" id="metrics-grid"></div>
+        <div class="charts-row">
+          <div class="card">
+            <div class="card-title">Spend by account (top 8)</div>
+            <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Services — highest account</div>
+            <div id="pie-legend" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+            <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+          </div>
+        </div>
+        <div class="tcard">
+          <div class="tcard-head">
+            <h2>All accounts — spend summary</h2>
+            <input type="text" class="search" placeholder="Search..." oninput="filterTable('sum-tbody',this.value)"/>
+          </div>
+          <div style="overflow-x:auto">
+            <table><thead><tr>
+              <th>Account</th><th>Subscription ID</th><th>Spend</th><th>Budget</th><th>Usage</th><th>Status</th>
+            </tr></thead>
+            <tbody id="sum-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTS -->
+    <div id="page-accounts" class="page">
+      <div class="tcard">
+        <div class="tcard-head">
+          <h2>Registered accounts</h2>
+          <input type="text" class="search" placeholder="Search..." oninput="filterTable('accreg-tbody',this.value)"/>
+        </div>
+        <div style="overflow-x:auto">
+          <table><thead><tr>
+            <th>Label</th><th>Subscription name</th><th>Subscription ID</th><th>Budget (USD)</th><th>Added</th><th>Action</th>
+          </tr></thead>
+          <tbody id="accreg-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVOICE -->
+    <div id="page-invoice" class="page">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        <select class="sel" id="inv-acc-sel" onchange="renderInvoice()" style="min-width:240px"></select>
+        <button class="btn btn-ghost" onclick="window.print()">Print / PDF</button>
+      </div>
+      <div class="inv-wrap" id="inv-content"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="page-admin" class="page">
+      <div class="admin-grid">
+
+        <!-- Add form -->
+        <div>
+          <div class="form-card">
+            <h2 id="form-title">Add new account</h2>
+            <input type="hidden" id="edit-sub-id"/>
+
+            <div class="field">
+              <label>Account label *</label>
+              <input id="f-label" placeholder="e.g. Client A — Production"/>
+            </div>
+            <div class="field">
+              <label>Tenant ID *</label>
+              <input id="f-tenant" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+              <div class="hint-text">Azure AD → Properties → Tenant ID</div>
+            </div>
+            <div class="field">
+              <label>Client ID (App registration) *</label>
+              <input id="f-client" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+            </div>
+            <div class="field">
+              <label>Client Secret *</label>
+              <input id="f-secret" type="password" placeholder="Client secret value"/>
+            </div>
+            <div class="field">
+              <label>Subscription ID *</label>
+              <input id="f-subid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+            </div>
+            <div class="field">
+              <label>Monthly budget (USD, optional)</label>
+              <input id="f-budget" type="number" placeholder="e.g. 5000"/>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="save-btn" onclick="saveAccount()">Save account</button>
+              <button class="btn btn-ghost" onclick="resetForm()">Clear</button>
+            </div>
+            <div class="form-msg" id="form-msg"></div>
+          </div>
+
+          <!-- CSV import -->
+          <div class="form-card" style="margin-top:14px">
+            <h2>Bulk import via CSV</h2>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">CSV columns: <code style="font-size:11px;background:var(--bg);padding:1px 4px;border-radius:3px">label,tenantId,clientId,clientSecret,subscriptionId,budgetUsd</code></p>
+            <div class="csv-area" onclick="document.getElementById('csv-file').click()">
+              Click to upload CSV file
+              <input type="file" id="csv-file" accept=".csv" onchange="importCSV(this)"/>
+            </div>
+            <div class="form-msg" id="csv-msg"></div>
+          </div>
+        </div>
+
+        <!-- Registered list -->
+        <div>
+          <div class="tcard">
+            <div class="tcard-head">
+              <h2>Registered accounts (<span id="reg-count">0</span>)</h2>
+              <input type="text" class="search" placeholder="Search..." oninput="filterTable('admin-tbody',this.value)"/>
+            </div>
+            <div id="progress-area" class="progress-overlay">
+              <div style="font-size:13px;font-weight:500" id="prog-label">Importing...</div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-bar" style="width:0%"></div></div>
+              <div style="font-size:12px;color:var(--muted)" id="prog-detail"></div>
+            </div>
+            <div style="overflow-x:auto">
+              <table><thead><tr>
+                <th>Label</th><th>Subscription ID</th><th>Budget</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="admin-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+const COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#c62828','#00838f','#f57f17','#4527a0','#1565c0','#558b2f','#6d4c41','#00695c'];
+const PIE_COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#00838f','#aaa'];
+
+let BILLING=null, REGISTRY=[], barInst=null, pieInst=null;
+
+const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
+const fmtDate=s=>new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+// ── nav ───────────────────────────────────────────────────────────────────────
+function showPage(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+  const titles={overview:'Overview',accounts:'Accounts',invoice:'Invoice',admin:'Manage accounts'};
+  document.getElementById('page-title').textContent=titles[name];
+  if(name==='accounts') renderRegTable();
+  if(name==='invoice'&&BILLING) renderInvoice();
+  if(name==='admin') renderAdminTable();
+}
+
+// ── status ────────────────────────────────────────────────────────────────────
+function setStatus(ok,msg,time){
+  document.getElementById('status-dot').className='dot'+(ok?'':' err');
+  document.getElementById('status-txt').textContent=msg;
+  if(time) document.getElementById('status-time').textContent=time;
+}
+
+// ── load registry ─────────────────────────────────────────────────────────────
+async function loadRegistry(){
+  try{
+    const r=await fetch('/api/accounts');
+    const d=await r.json();
+    REGISTRY=d.accounts||[];
+    document.getElementById('acc-count').textContent=REGISTRY.length;
+    document.getElementById('reg-count').textContent=REGISTRY.length;
+  }catch(e){console.warn('Registry load failed',e.message)}
+}
+
+// ── load billing ──────────────────────────────────────────────────────────────
+async function loadBilling(){
+  const btn=document.getElementById('refresh-btn');
+  btn.disabled=true; btn.textContent='Loading...';
+  document.getElementById('err-banner').style.display='none';
+  document.getElementById('ov-loader').style.display='flex';
+  document.getElementById('ov-content').style.display='none';
+  setStatus(true,'Fetching...','');
+  try{
+    const r=await fetch('/api/billing');
+    if(!r.ok){const e=await r.json().catch(()=>({error:r.statusText}));throw new Error(e.error||r.statusText)}
+    BILLING=await r.json();
+    renderAll();
+    const errs=(BILLING.accounts||[]).filter(a=>a.error).length;
+    setStatus(errs===0,'Live data'+(errs>0?` (${errs} errors)`:''),'Updated '+new Date().toLocaleTimeString('en-IN'));
+  }catch(e){
+    document.getElementById('err-banner').style.display='block';
+    document.getElementById('err-banner').textContent='Error: '+e.message;
+    setStatus(false,'Error','');
+  }finally{
+    btn.disabled=false; btn.textContent='Refresh';
+    document.getElementById('ov-loader').style.display='none';
+  }
+}
+
+// ── render overview ───────────────────────────────────────────────────────────
+function renderAll(){
+  const accs=BILLING.accounts||[];
+  document.getElementById('ov-content').style.display='block';
+  // metrics
+  const total=accs.reduce((s,a)=>s+a.total,0);
+  const top=[...accs].sort((a,b)=>b.total-a.total)[0]||{};
+  const errors=accs.filter(a=>a.error).length;
+  const overBudget=accs.filter(a=>a.budgetUsd&&a.total>a.budgetUsd).length;
+  document.getElementById('metrics-grid').innerHTML=[
+    ['Total spend',fmt(total),BILLING.month,''],
+    ['Accounts',accs.length,'Connected',''],
+    ['Highest spender',top.label||top.name||'—',fmt(top.total||0),'up'],
+    ['Alerts',overBudget+errors,overBudget+' over budget, '+errors+' errors','up'],
+  ].map(([l,v,s,c])=>`<div class="metric"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub ${c}">${s}</div></div>`).join('');
+  // bar chart
+  const top8=[...accs].sort((a,b)=>b.total-a.total).slice(0,8);
+  const bctx=document.getElementById('barChart');
+  if(barInst)barInst.destroy();
+  barInst=new Chart(bctx,{type:'bar',data:{
+    labels:top8.map(a=>(a.label||a.subscriptionId).slice(0,14)),
+    datasets:[{data:top8.map(a=>Math.round(a.total)),backgroundColor:top8.map((_,i)=>COLORS[i%COLORS.length]),borderRadius:4,borderSkipped:false}]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)}}},
+    scales:{x:{ticks:{font:{size:10},maxRotation:35},grid:{display:false}},
+            y:{ticks:{font:{size:10},callback:v=>'$'+Math.round(v/1000)+'k'},grid:{color:'#e2e6ea44'}}}}});
+  // pie chart
+  if(top.services&&top.services.length){
+    const svcs=top.services.slice(0,6);
+    document.getElementById('pie-legend').innerHTML=svcs.map((s,i)=>
+      `<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:${PIE_COLORS[i]};flex-shrink:0"></span>${s.name.split(' ')[0]}</span>`).join('');
+    const pctx=document.getElementById('pieChart');
+    if(pieInst)pieInst.destroy();
+    pieInst=new Chart(pctx,{type:'doughnut',data:{
+      labels:svcs.map(s=>s.name),
+      datasets:[{data:svcs.map(s=>Math.round(s.cost)),backgroundColor:PIE_COLORS,borderWidth:2,borderColor:'#fff'}]
+    },options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}}}});
+  }
+  // summary table
+  document.getElementById('sum-tbody').innerHTML=accs.map(a=>{
+    const pct=a.budgetUsd?Math.min(100,Math.round(a.total/a.budgetUsd*100)):null;
+    const bc=pct===null?'#0078d4':pct>=100?'#c62828':pct>=85?'#e65100':'#0078d4';
+    const badge=a.error?'b-err':pct===null?'b-ok':pct>=100?'b-over':pct>=85?'b-warn':'b-ok';
+    const label=a.error?'Error':pct===null?'OK':pct>=100?'Over budget':pct>=85?'Near limit':'OK';
+    return `<tr>
+      <td><strong>${a.label||'—'}</strong></td>
+      <td><span class="mono">${a.subscriptionId}</span></td>
+      <td><strong>${fmt(a.total)}</strong></td>
+      <td>${a.budgetUsd?fmt(a.budgetUsd):'—'}</td>
+      <td>${pct!==null?`<div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${bc}"></div></div><span style="font-size:11px;color:var(--muted)">${pct}%</span></div>`:'—'}</td>
+      <td><span class="badge ${badge}">${label}</span>${a.error?`<div style="font-size:10px;color:var(--red);margin-top:2px">${a.error.slice(0,60)}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  // populate invoice select
+  const sel=document.getElementById('inv-acc-sel');
+  const prev=sel.value;
+  sel.innerHTML=accs.map((a,i)=>`<option value="${i}">${a.label||a.subscriptionId} (${a.subscriptionId.slice(0,8)}…)</option>`).join('');
+  if(prev&&sel.querySelector(`option[value="${prev}"]`))sel.value=prev;
+}
+
+// ── registered accounts table ─────────────────────────────────────────────────
+function renderRegTable(){
+  document.getElementById('accreg-tbody').innerHTML=REGISTRY.map(a=>`<tr>
+    <td><strong>${a.label}</strong></td>
+    <td>${a.subName||'—'}</td>
+    <td><span class="mono">${a.subscriptionId}</span></td>
+    <td>${a.budgetUsd?fmt(a.budgetUsd):'—'}</td>
+    <td style="font-size:12px;color:var(--muted)">${fmtDate(a.addedAt)}</td>
+    <td><button class="btn btn-danger" style="padding:4px 9px;font-size:11px" onclick="deleteAccount('${a.subscriptionId}','${a.label}')">Remove</button></td>
+  </tr>`).join('');
+}
+
+// ── admin table ───────────────────────────────────────────────────────────────
+function renderAdminTable(){
+  document.getElementById('admin-tbody').innerHTML=REGISTRY.map(a=>`<tr>
+    <td><strong>${a.label}</strong></td>
+    <td><span class="mono">${a.subscriptionId}</span></td>
+    <td>${a.budgetUsd?fmt(a.budgetUsd):'—'}</td>
+    <td style="display:flex;gap:6px">
+      <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="editAccount('${a.subscriptionId}')">Edit</button>
+      <button class="btn btn-danger" style="padding:4px 9px;font-size:11px" onclick="deleteAccount('${a.subscriptionId}','${a.label}')">Delete</button>
+    </td>
+  </tr>`).join('');
+  document.getElementById('reg-count').textContent=REGISTRY.length;
+}
+
+function filterTable(tbodyId,q){
+  document.querySelectorAll('#'+tbodyId+' tr').forEach(tr=>{
+    tr.style.display=tr.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+
+// ── save account ──────────────────────────────────────────────────────────────
+async function saveAccount(){
+  const label=document.getElementById('f-label').value.trim();
+  const tenantId=document.getElementById('f-tenant').value.trim();
+  const clientId=document.getElementById('f-client').value.trim();
+  const clientSecret=document.getElementById('f-secret').value.trim();
+  const subscriptionId=document.getElementById('f-subid').value.trim();
+  const budgetUsd=document.getElementById('f-budget').value.trim();
+
+  if(!label||!tenantId||!clientId||!clientSecret||!subscriptionId){
+    showFormMsg('form-msg','fail','Sab required fields bharen.');return;
+  }
+  const btn=document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='Saving...';
+  showFormMsg('form-msg','','');
+  try{
+    const r=await fetch('/api/accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({label,tenantId,clientId,clientSecret,subscriptionId,budgetUsd:budgetUsd||null})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||r.statusText);
+    showFormMsg('form-msg','ok',`"${label}" saved! Subscription: ${d.account.subName}`);
+    resetForm();
+    await loadRegistry();
+    renderAdminTable();
+  }catch(e){
+    showFormMsg('form-msg','fail','Error: '+e.message);
+  }finally{btn.disabled=false;btn.textContent='Save account'}
+}
+
+function showFormMsg(id,cls,msg){
+  const el=document.getElementById(id);
+  el.className='form-msg'+(cls?' '+cls:'');
+  el.textContent=msg;
+  if(cls)el.style.display='block'; else el.style.display='none';
+}
+
+function resetForm(){
+  ['f-label','f-tenant','f-client','f-secret','f-subid','f-budget','edit-sub-id'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  document.getElementById('form-title').textContent='Add new account';
+  document.getElementById('save-btn').textContent='Save account';
+  showFormMsg('form-msg','','');
+}
+
+function editAccount(subId){
+  const a=REGISTRY.find(x=>x.subscriptionId===subId);
+  if(!a)return;
+  document.getElementById('f-label').value=a.label;
+  document.getElementById('f-subid').value=a.subscriptionId;
+  document.getElementById('f-budget').value=a.budgetUsd||'';
+  document.getElementById('edit-sub-id').value=subId;
+  document.getElementById('form-title').textContent='Edit account';
+  document.getElementById('save-btn').textContent='Update account';
+  document.getElementById('f-tenant').focus();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function deleteAccount(subId,label){
+  if(!confirm(`"${label}" ko remove karna chahte hain?`))return;
+  try{
+    const r=await fetch(`/api/accounts/${subId}`,{method:'DELETE'});
+    if(!r.ok)throw new Error((await r.json()).error);
+    await loadRegistry();
+    renderAdminTable();
+    renderRegTable();
+  }catch(e){alert('Delete failed: '+e.message)}
+}
+
+// ── CSV import ────────────────────────────────────────────────────────────────
+async function importCSV(input){
+  const file=input.files[0]; if(!file)return;
+  const text=await file.text();
+  const lines=text.trim().split('\n').filter(l=>l.trim()&&!l.startsWith('label'));
+  if(!lines.length){showFormMsg('csv-msg','fail','CSV empty or invalid.');return;}
+  const prog=document.getElementById('progress-area');
+  prog.style.display='block';
+  let done=0,errs=0;
+  for(const line of lines){
+    const [label,tenantId,clientId,clientSecret,subscriptionId,budgetUsd]= line.split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+    document.getElementById('prog-label').textContent=`Importing ${done+1}/${lines.length}…`;
+    document.getElementById('prog-detail').textContent=label||subscriptionId;
+    document.getElementById('prog-bar').style.width=Math.round((done/lines.length)*100)+'%';
+    try{
+      const r=await fetch('/api/accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({label,tenantId,clientId,clientSecret,subscriptionId,budgetUsd:budgetUsd||null})});
+      if(!r.ok)errs++;
+    }catch{errs++}
+    done++;
+  }
+  document.getElementById('prog-bar').style.width='100%';
+  document.getElementById('prog-label').textContent='Import complete';
+  document.getElementById('prog-detail').textContent=`${done-errs} successful, ${errs} failed`;
+  showFormMsg('csv-msg',errs===0?'ok':'fail',`${done-errs}/${done} accounts imported.`+(errs>0?` ${errs} failed — check credentials.`:''));
+  await loadRegistry(); renderAdminTable();
+  input.value='';
+}
+
+// ── invoice ───────────────────────────────────────────────────────────────────
+function renderInvoice(){
+  if(!BILLING)return;
+  const accs=BILLING.accounts||[];
+  const idx=parseInt(document.getElementById('inv-acc-sel').value)||0;
+  const a=accs[idx]; if(!a)return;
+  const svcs=a.services||[];
+  const sub=Math.round(a.total);
+  const gst=Math.round(sub*0.18);
+  const tot=sub+gst;
+  const now=new Date();
+  const mo=BILLING.month||now.toISOString().slice(0,7);
+  const [yr,mn]=mo.split('-');
+  const moName=new Date(yr,mn-1).toLocaleString('en-IN',{month:'long',year:'numeric'});
+  const invNum=`INV-${yr.slice(2)}${mn}-${a.subscriptionId.slice(-4).toUpperCase()}`;
+  document.getElementById('inv-content').innerHTML=`
+    <div class="inv-hdr">
+      <div class="inv-logo">
+        <div class="inv-logo-icon"><svg viewBox="0 0 18 18"><path d="M9 1L1 6v6l8 5 8-5V6L9 1zm0 2.2l5.8 3.3-2.1 1.2L9 5.5 5.3 7.7 3.2 6.5 9 3.2zM2.5 7.6l2.1 1.2v2.4L9 13.5l4.4-2.3V8.8l2.1-1.2V11l-6.5 4-6.5-4V7.6z"/></svg></div>
+        Microsoft Azure
+      </div>
+      <div class="inv-meta"><div class="n">Invoice ${invNum}</div><div class="d">Billing period: ${moName}</div><div class="d">Due: 15th of next month</div></div>
+    </div>
+    <hr class="div">
+    <div class="inv-2col">
+      <div><div class="al">Bill to</div><div class="an">${a.label}</div><div class="ad">Subscription: <code style="font-size:11px">${a.subscriptionId}</code></div></div>
+      <div><div class="al">Billed by</div><div class="an">Microsoft Azure India</div><div class="ad">GSTIN: 36AAACM9517G1ZN</div></div>
+    </div>
+    <div class="inv-stats">
+      <div class="is"><div class="l">Total (incl. GST)</div><div class="v">${fmt(tot)}</div><div class="s">18% GST applied</div></div>
+      <div class="is"><div class="l">Services</div><div class="v">${svcs.length}</div><div class="s">Active this month</div></div>
+      <div class="is"><div class="l">Month</div><div class="v" style="font-size:14px">${moName}</div></div>
+    </div>
+    <hr class="div">
+    <table class="inv-table">
+      <thead><tr><th style="width:55%">Service</th><th style="text-align:right;width:22%">Amount (USD)</th><th style="text-align:right;width:23%">% of total</th></tr></thead>
+      <tbody>${svcs.map(s=>`<tr>
+        <td>${s.name}</td>
+        <td style="text-align:right;font-family:monospace;font-size:12px">${fmt(s.cost)}</td>
+        <td style="text-align:right;font-size:12px;color:var(--muted)">${sub>0?Math.round(s.cost/sub*100):0}%</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="inv-totals"><div class="itb">
+      <div class="tr"><span>Subtotal</span><span>${fmt(sub)}</span></div>
+      <div class="tr"><span>GST (18%)</span><span>${fmt(gst)}</span></div>
+      <div class="tr grand"><span>Total due</span><span>${fmt(tot)}</span></div>
+    </div></div>
+    <div class="inv-foot">Payment: Azure Portal → Cost Management + Billing → Invoices | Ref: ${invNum}</div>`;
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+(async()=>{
+  await loadRegistry();
+  await loadBilling();
+})();
+</script>
+</body>
+</html>
