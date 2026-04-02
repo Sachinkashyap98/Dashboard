@@ -354,15 +354,17 @@ async function fetchRate() {
   } catch { /* use fallback */ }
 }
 
-function fmtAmt(usd) {
-  if (CURRENCY === 'INR') {
-    const inr = usd * USD_TO_INR;
+function fmtAmt(usd, accountCurrency) {
+  const isInr = accountCurrency === 'INR';
+  if (CURRENCY === 'INR' || accountCurrency === 'INR') {
+    // if account is already INR, use as-is; else convert
+    const inr = isInr ? usd : usd * USD_TO_INR;
     return '₹' + Math.round(inr).toLocaleString('en-IN');
   }
   return '$' + Math.round(usd).toLocaleString('en-US');
 }
 
-const fmt = n => fmtAmt(n);
+const fmt = (n, cur) => fmtAmt(n, cur);
 const fmtDate=s=>new Date(s).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
 
 // ── nav ───────────────────────────────────────────────────────────────────────
@@ -469,9 +471,9 @@ function renderAll(){
   const errors=accs.filter(a=>a.error).length;
   const overBudget=accs.filter(a=>a.budgetUsd&&a.total>a.budgetUsd).length;
   document.getElementById('metrics-grid').innerHTML=[
-    ['Total spend',fmt(total),BILLING.month,''],
+    ['Total spend',fmt(total,'MIXED'),BILLING.month,''],
     ['Accounts',accs.length,'Connected',''],
-    ['Highest spender',top.label||top.name||'—',fmt(top.total||0),'up'],
+    ['Highest spender',top.label||top.name||'—',fmt(top.total||0,top.currency),'up'],
     ['Alerts',overBudget+errors,overBudget+' over budget, '+errors+' errors','up'],
   ].map(([l,v,s,c])=>`<div class="metric"><div class="lbl">${l}</div><div class="val">${v}</div><div class="sub ${c}">${s}</div></div>`).join('');
   // bar chart
@@ -507,8 +509,8 @@ function renderAll(){
     return `<tr>
       <td><strong>${a.label||'—'}</strong></td>
       <td><span class="mono">${a.subscriptionId}</span></td>
-      <td><strong>${fmt(a.total)}</strong></td>
-      <td>${a.budgetUsd?fmt(a.budgetUsd):'—'}</td>
+      <td><strong>${fmt(a.total,a.currency)}</strong></td>
+      <td>${a.budgetUsd?fmt(a.budgetUsd,a.currency):'—'}</td>
       <td>${pct!==null?`<div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${bc}"></div></div><span style="font-size:11px;color:var(--muted)">${pct}%</span></div>`:'—'}</td>
       <td><span class="badge ${badge}">${label}</span>${a.error?`<div style="font-size:10px;color:var(--red);margin-top:2px">${a.error.slice(0,60)}</div>`:''}</td>
     </tr>`;

@@ -110,6 +110,8 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
   const rows = r.body.properties?.rows || [];
   const costIdx = cols.indexOf("cost");
   const svcIdx = cols.indexOf("servicename");
+  const curIdx = cols.indexOf("billingcurrencycode");
+  const currency = rows[0]?.[curIdx] || "USD";
 
   const services = [];
   let total = 0;
@@ -120,7 +122,7 @@ async function fetchBilling(token, subscriptionId, monthOffset = 0) {
     total += cost;
   }
   services.sort((a, b) => b.cost - a.cost);
-  return { services, total: Math.round(total * 100) / 100 };
+  return { services, total: Math.round(total * 100) / 100, currency };
 }
 
 // ── Key Vault helpers ─────────────────────────────────────────────────────────

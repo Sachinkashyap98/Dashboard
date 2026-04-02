@@ -14,8 +14,8 @@ async function fetchOne(account, monthOffset) {
     if (!credsRaw) return { ...account, error: "Credentials not found in Key Vault", total: 0, services: [] };
     const { tenantId, clientId, clientSecret } = JSON.parse(credsRaw);
     const token = await getToken(tenantId, clientId, clientSecret);
-    const { services, total } = await fetchBilling(token, account.subscriptionId, monthOffset);
-    return { ...account, total, services, error: null };
+    const { services, total, currency } = await fetchBilling(token, account.subscriptionId, monthOffset);
+    return { ...account, total, services, currency, error: null };
   } catch (e) {
     return { ...account, total: 0, services: [], error: e.message };
   }
@@ -61,8 +61,8 @@ module.exports = async function (context, req) {
 
     // Also expose flat "accounts" for current month (backward compat)
     const accounts = m0.sort((a, b) => b.total - a.total).map(
-      ({ id, label, subscriptionId, subName, budgetUsd, total, services, error }) =>
-        ({ id, label, subscriptionId, subName, budgetUsd, total, services, error })
+      ({ id, label, subscriptionId, subName, budgetUsd, total, services, currency, error }) =>
+        ({ id, label, subscriptionId, subName, budgetUsd, total, services, currency, error })
     );
 
     context.res = {
