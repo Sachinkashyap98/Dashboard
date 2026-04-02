@@ -131,26 +131,15 @@ async function getKeyVaultToken() {
   const header   = process.env.IDENTITY_HEADER;
 
   if (!endpoint || !header)
-    throw new Error("Managed Identity not configured (IDENTITY_ENDPOINT/IDENTITY_HEADER missing)");
+    throw new Error("Managed Identity not configured");
 
-  const url = new URL(`${endpoint}?api-version=2019-08-01&resource=https://vault.azure.net`);
-  const lib = url.protocol === "https:" ? https : http;
+  const url = `${endpoint}?api-version=2019-08-01&resource=https://vault.azure.net`;
+  const res = await fetch(url, { headers: { "X-IDENTITY-HEADER": header } });
+  const data = await res.json();
 
-  const r = await new Promise((resolve, reject) => {
-    const req = lib.get(
-      { hostname: url.hostname, path: url.pathname + url.search, headers: { "X-IDENTITY-HEADER": header } },
-      (res) => {
-        let raw = "";
-        res.on("data", c => raw += c);
-        res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
-      }
-    );
-    req.on("error", reject);
-  });
-
-  if (!r.body.access_token)
-    throw new Error(`Managed Identity token failed: ${JSON.stringify(r.body)}`);
-  return r.body.access_token;
+  if (!data.access_token)
+    throw new Error(`Managed Identity token failed: ${JSON.stringify(data)}`);
+  return data.access_token;
 }
 
 const KV_HOST = () => {
