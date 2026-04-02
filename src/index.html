@@ -189,7 +189,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
         <option value="-1">Last month</option>
         <option value="-2">2 months ago</option>
       </select>
-      <button class="btn btn-ghost" id="currency-btn" onclick="toggleCurrency()">Show in ₹ INR</button>
+      <button class="btn btn-ghost" id="currency-btn" onclick="toggleCurrency()">Show in $ USD</button>
       <button class="btn btn-primary" id="refresh-btn" onclick="loadBilling()">Refresh</button>
     </div>
   </div>
@@ -344,7 +344,7 @@ const PIE_COLORS=['#0078d4','#2e7d32','#7b1fa2','#e65100','#00838f','#aaa'];
 
 let BILLING=null, ALL_MONTHS=[], REGISTRY=[], barInst=null, pieInst=null, trendInst=null;
 let USD_TO_INR = 84; // fallback rate
-let CURRENCY = 'USD';
+let CURRENCY = 'INR';
 
 async function fetchRate() {
   try {
@@ -355,11 +355,8 @@ async function fetchRate() {
 }
 
 function fmtAmt(usd, accountCurrency) {
-  const isInr = accountCurrency === 'INR';
-  if (CURRENCY === 'INR' || accountCurrency === 'INR') {
-    // if account is already INR, use as-is; else convert
-    const inr = isInr ? usd : usd * USD_TO_INR;
-    return '₹' + Math.round(inr).toLocaleString('en-IN');
+  if (CURRENCY === 'INR') {
+    return '₹' + Math.round(usd * USD_TO_INR).toLocaleString('en-IN');
   }
   return '$' + Math.round(usd).toLocaleString('en-US');
 }
